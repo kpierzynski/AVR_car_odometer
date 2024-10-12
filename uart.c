@@ -107,7 +107,6 @@ void uart_putd16(uint16_t word)
     uart_putc((word / 1000) % 10 + '0');
     uart_putc((word / 100) % 10 + '0');
     uart_putc((word / 10) % 10 + '0');
-    uart_putc((word / 10) % 10 + '0');
     uart_putc((word / 1) % 10 + '0');
 }
 

@@ -75,7 +75,7 @@ void obd_request22(uint16_t pid)
 
     uint8_t buf[] = {0x02, 0x22, (uint8_t)(pid & 0xFF), (uint8_t)(pid >> 8)};
     MCP2515_result_t status;
-    if ((status = mcp2515_put(0x7E0, 8, 0, buf, 4)) != MCP2515_RESULT_SUCCESS)
+    if ((status = mcp2515_put(0x7E8, 8, 0, buf, 4)) != MCP2515_RESULT_SUCCESS)
         mcp2515_get_error(status);
 }
 
