@@ -4,7 +4,7 @@ F_CPU=16000000
 CC=avr-gcc
 OBJCOPY=avr-objcopy
 
-CFLAGS=-Wall -g -Os -mmcu=${MCU} -DF_CPU=${F_CPU} -I.
+CFLAGS=-Wall -Werror -g -Os -mmcu=${MCU} -DF_CPU=${F_CPU} -I.
 
 AVRDUDE_FLAGS=
 
@@ -39,4 +39,5 @@ reset:
 .PHONY: clean
 
 clean:
+	clear
 	rm -rf *.bin *.hex *.o ${BUILD_DIR} html/ latex/

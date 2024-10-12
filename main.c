@@ -57,18 +57,39 @@ int16_t oil_temperature = 0;
 
 void obd_request(uint8_t pid)
 {
+    uart_puts("Requesting PID: ");
+    uart_putd(pid);
+    uart_puts("\r\n");
+
     uint8_t buf[] = {0x02, 0x01, pid};
-    if (mcp2515_put(0x7DF, 8, 0, buf, 3) != MCP2515_RESULT_SUCCESS)
-        uart_puts("Put failed.\r\n");
+    MCP2515_result_t status;
+    if ((status = mcp2515_put(0x7DF, 8, 0, buf, 3)) != MCP2515_RESULT_SUCCESS)
+        mcp2515_get_error(status);
+}
+
+void obd_request22(uint16_t pid)
+{
+    uart_puts("Requesting PID: ");
+    uart_putd16(pid);
+    uart_puts("\r\n");
+
+    uint8_t buf[] = {0x02, 0x22, (uint8_t)(pid & 0xFF), (uint8_t)(pid >> 8)};
+    MCP2515_result_t status;
+    if ((status = mcp2515_put(0x7E0, 8, 0, buf, 4)) != MCP2515_RESULT_SUCCESS)
+        mcp2515_get_error(status);
 }
 
 void rx_obd(uint16_t id, uint8_t *buf, uint8_t len)
 {
-    if (len < 3)
+    uart_puts("Received length: ");
+    uart_putd(len);
+    uart_puts(", bytes: ");
+    for (uint8_t i = 0; i < len; i++)
     {
-        uart_puts("Invalid length.\r\n");
-        return;
+        uart_putd(buf[i]);
+        uart_puts(" ");
     }
+    uart_puts("\r\n");
 
     switch (buf[2])
     {
@@ -81,7 +102,11 @@ void rx_obd(uint16_t id, uint8_t *buf, uint8_t len)
         return;
 
     default:
-        uart_puts("Unknown PID.\r\n");
+        uart_puts("Unknown PID: ");
+        uart_putd(buf[2]);
+        uart_puts(".\r\nTry to convert: ");
+        uart_putd16(OBD2_PID_ENGINE_TEMP_CONV(buf[3], buf[4]));
+        uart_puts("\r\n");
         return;
     }
 }
@@ -96,7 +121,7 @@ uint16_t value_to_rgb565(uint8_t value)
 
 int main()
 {
-    _delay_ms(2000);
+    _delay_ms(3000);
 
     spi_init();
     uart_init();
@@ -169,15 +194,18 @@ int main()
             }
         }
 
-        if (isTimerExpired(0))
-        {
-            obd_request(OBD2_PID_VEHICLE_SPEED);
-            startTimer(0, 500);
-        }
+        // if (isTimerExpired(0))
+        // {
+        //     uart_puts_P(PSTR("Requesting speed.\r\n"));
+        //     obd_request(OBD2_PID_VEHICLE_SPEED);
+        //     startTimer(0, 500);
+        // }
 
         if (isTimerExpired(1))
         {
-            obd_request(OBD2_PID_OIL_TEMP);
+            uart_puts_P(PSTR("Requesting oil temperature.\r\n"));
+            // obd_request(OBD2_PID_OIL_TEMP);
+            obd_request22(OBD2_PID_ENGINE_TEMP);
             startTimer(1, 3250);
         }
     }

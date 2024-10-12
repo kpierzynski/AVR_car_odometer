@@ -4,6 +4,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "spi.h"
+#include "uart.h"
 
 #define USE_IRQ
 
@@ -11,7 +12,15 @@ typedef enum MCP2515_result
 {
     MCP2515_RESULT_SUCCESS = 0,
     MCP2515_RESULT_ERROR = 1,
-    MCP2515_RESULT_INVALID_PARAMETER = 2
+    MCP2515_RESULT_INVALID_PARAMETER = 2,
+    MCP2515_RESULT_INVALID_ID = 3,
+    MCP2515_RESULT_INVALID_MASK = 4,
+    MCP2515_RESULT_CONFIG_ERROR = 5,
+    MCP2515_RESULT_INVALID_DLC = 6,
+    MCP2515_RESULT_MESSAGE_ABORTED = 7,
+    MCP2515_RESULT_ARBITRATION_LOST = 8,
+    MCP2515_RESULT_TX_ERROR = 9,
+    MCP2515_RESULT_NO_MESSAGE = 10,
 } MCP2515_result_t;
 
 typedef struct
@@ -99,5 +108,7 @@ MCP2515_result_t mcp2515_filer(uint16_t id, uint16_t mask);
 
 MCP2515_result_t mcp2515_put(uint16_t id, int8_t dlc, int8_t rtr, uint8_t *data, uint8_t len);
 MCP2515_result_t mcp2515_get(uint8_t *rx_data);
+
+void mcp2515_get_error(MCP2515_result_t result);
 
 #endif

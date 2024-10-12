@@ -1,6 +1,8 @@
 #include "mcp2515.h"
 
+#ifdef USE_IRQ
 static uint8_t irq_request = 0;
+#endif
 
 static void (*mcp2515_rx_event_callback)(uint16_t id, uint8_t *buf, uint8_t len);
 
@@ -93,13 +95,16 @@ MCP2515_result_t mcp2515_init()
 
 MCP2515_result_t mcp2515_filer(uint16_t id, uint16_t mask)
 {
-    mask &= 0x7FF;
-    id &= 0x7FF;
+    // mask &= 0x7FF;
+    // id &= 0x7FF;
 
-    // if (id > 0x7FF || mask > 0x7FF) return MCP2515_RESULT_INVALID_PARAMETER;
+    if (id > 0x7FF)
+        return MCP2515_RESULT_INVALID_ID;
+    if (mask > 0x7FF)
+        return MCP2515_RESULT_INVALID_MASK;
 
     if (mcp2515_enter_config() != MCP2515_RESULT_SUCCESS)
-        return MCP2515_RESULT_ERROR;
+        return MCP2515_RESULT_CONFIG_ERROR;
 
     for (uint8_t n = 0; n < 2; n++)
     {
@@ -123,15 +128,18 @@ MCP2515_result_t mcp2515_filer(uint16_t id, uint16_t mask)
 
     mcp2515_write_reg(REG_CANCTRL, 0x00);
     if (mcp2515_read_reg(REG_CANCTRL) != 0x00)
-        return MCP2515_RESULT_ERROR;
+        return MCP2515_RESULT_CONFIG_ERROR;
 
     return MCP2515_RESULT_SUCCESS;
 }
 
 MCP2515_result_t mcp2515_put(uint16_t id, int8_t dlc, int8_t rtr, uint8_t *data, uint8_t len)
 {
-    if (id > 0x7FF || dlc > 8)
-        return MCP2515_RESULT_INVALID_PARAMETER;
+    if (id > 0x7FF)
+        return MCP2515_RESULT_INVALID_ID;
+
+    if (dlc > 8)
+        return MCP2515_RESULT_INVALID_DLC;
 
     mcp2515_write_reg(REG_TXBnSIDH(0), id >> 3);
     mcp2515_write_reg(REG_TXBnSIDL(0), id << 5);
@@ -162,20 +170,35 @@ MCP2515_result_t mcp2515_put(uint16_t id, int8_t dlc, int8_t rtr, uint8_t *data,
 
     mcp2515_modify_reg(REG_CANINTF, FLAG_TXnIF(0), 0x00);
 
-    return (mcp2515_read_reg(REG_TXBnCTRL(0)) & 0x70) ? MCP2515_RESULT_ERROR : MCP2515_RESULT_SUCCESS;
+    uint8_t control = (mcp2515_read_reg(REG_TXBnCTRL(0)) & 0x70);
+
+    if (control == 0x00)
+        return MCP2515_RESULT_SUCCESS;
+
+    switch (control)
+    {
+    case (1 << 6):
+        return MCP2515_RESULT_MESSAGE_ABORTED;
+    case (1 << 5):
+        return MCP2515_RESULT_ARBITRATION_LOST;
+    case (1 << 4):
+        return MCP2515_RESULT_TX_ERROR;
+    }
+
+    return MCP2515_RESULT_ERROR;
 }
 
 MCP2515_result_t mcp2515_get(uint8_t *rx_data)
 {
 #ifdef USE_IRQ
     if (!irq_request)
-        return MCP2515_RESULT_ERROR;
+        return MCP2515_RESULT_NO_MESSAGE;
 #endif
 
     uint8_t status = mcp2515_read_reg(REG_CANINTF);
 
     if (!(status & FLAG_RXnIF(0)))
-        return MCP2515_RESULT_ERROR;
+        return MCP2515_RESULT_NO_MESSAGE;
 
     uint16_t id = ((mcp2515_read_reg(REG_RXBnSIDH(0)) << 3) & 0x07F8) | ((mcp2515_read_reg(REG_RXBnSIDL(0)) >> 5) & 0x07);
     uint8_t rx_rtr = (mcp2515_read_reg(REG_RXBnSIDL(0)) & FLAG_SRR) ? 1 : 0;
@@ -209,4 +232,44 @@ MCP2515_result_t mcp2515_get(uint8_t *rx_data)
 ISR(MCP2515_INT_vect)
 {
     irq_request = 1;
+}
+
+void mcp2515_get_error(MCP2515_result_t result)
+{
+    switch (result)
+    {
+    case MCP2515_RESULT_SUCCESS:
+        uart_puts_P(PSTR("MCP2515_RESULT_SUCCESS\r\n"));
+        break;
+    case MCP2515_RESULT_ERROR:
+        uart_puts_P(PSTR("MCP2515_RESULT_ERROR\r\n"));
+        break;
+    case MCP2515_RESULT_INVALID_PARAMETER:
+        uart_puts_P(PSTR("MCP2515_RESULT_INVALID_PARAMETER\r\n"));
+        break;
+    case MCP2515_RESULT_INVALID_ID:
+        uart_puts_P(PSTR("MCP2515_RESULT_INVALID_ID\r\n"));
+        break;
+    case MCP2515_RESULT_INVALID_MASK:
+        uart_puts_P(PSTR("MCP2515_RESULT_INVALID_MASK\r\n"));
+        break;
+    case MCP2515_RESULT_CONFIG_ERROR:
+        uart_puts_P(PSTR("MCP2515_RESULT_CONFIG_ERROR\r\n"));
+        break;
+    case MCP2515_RESULT_INVALID_DLC:
+        uart_puts_P(PSTR("MCP2515_RESULT_INVALID_DLC\r\n"));
+        break;
+    case MCP2515_RESULT_MESSAGE_ABORTED:
+        uart_puts_P(PSTR("MCP2515_RESULT_MESSAGE_ABORTED\r\n"));
+        break;
+    case MCP2515_RESULT_ARBITRATION_LOST:
+        uart_puts_P(PSTR("MCP2515_RESULT_ARBITRATION_LOST\r\n"));
+        break;
+    case MCP2515_RESULT_TX_ERROR:
+        uart_puts_P(PSTR("MCP2515_RESULT_TX_ERROR\r\n"));
+        break;
+    case MCP2515_RESULT_NO_MESSAGE:
+        uart_puts_P(PSTR("MCP2515_RESULT_NO_MESSAGE\r\n"));
+        break;
+    }
 }
